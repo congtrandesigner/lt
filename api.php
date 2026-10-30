@@ -1,84 +1,94 @@
 <?php
 // ====== CÀI ĐẶT MẬT KHẨU ======
-// Đổi các mật khẩu này trước khi up lên host. Mỗi mật khẩu phải khác nhau.
-// 'all' = thêm, sửa, xóa được cho cả 3 người (dành cho anh quản lý).
-// 'p1' = Sơ Kê, 'p2' = Đư Cờ, 'p3' = Cô Cô: xem được cả bảng, nhưng chỉ thêm, sửa, xóa phần của mình.
-$USERS = [
+// Mỗi người MỘT mật khẩu KHÁC NHAU. Nếu 2 dòng trùng mật khẩu, dòng dưới sẽ đè dòng trên.
+// Chỉ sửa chữ bên trái, giữ nguyên 'all', 'p1', 'p2', 'p3'.
+// 'all' = quản lý: thêm, sửa, xóa được cho cả 3 người.
+// 'p1' = Sơ Kê, 'p2' = Đư Cờ, 'p3' = Cô Cô: xem được cả bảng, chỉ thêm, sửa, xóa phần của mình.
+$USERS = array(
   'muadong' => 'all',
   'soke'   => 'p1',
   'duco'   => 'p2',
   'muadong2'   => 'p3',
-];
+);
 // ==============================
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
-$dir  = __DIR__ . '/data';
-$file = $dir . '/entries.json';
+function out($code, $data) {
+  if (function_exists('http_response_code')) http_response_code($code); else header('X-Status: ' . $code, true, $code);
+  echo json_encode($data);
+  exit;
+}
+function g($a, $k, $def) { return (is_array($a) && isset($a[$k])) ? $a[$k] : $def; }
 
-function out($code, $data) { http_response_code($code); echo json_encode($data, JSON_UNESCAPED_UNICODE); exit; }
+// Mật khẩu gửi trong thân yêu cầu (không dùng header, vì vài host chặn header lạ)
+$body = json_decode(file_get_contents('php://input'), true);
+if (!is_array($body)) $body = array();
+$pass = trim((string)g($body, 'pass', ''));
 
-$pass = $_SERVER['HTTP_X_PASS'] ?? '';
 $role = null;
-foreach ($USERS as $p => $r) { if ($pass !== '' && hash_equals((string)$p, $pass)) { $role = $r; break; } }
-if ($role === null) out(401, ['error' => 'sai_mat_khau']);
+foreach ($USERS as $p => $r) {
+  if ($pass !== '' && (string)$p === $pass) { $role = $r; break; }
+}
+if ($role === null) out(401, array('error' => 'sai_mat_khau'));
 
-if (!is_dir($dir) && !mkdir($dir, 0755, true)) out(500, ['error' => 'khong_tao_duoc_thu_muc_data']);
+$dir  = dirname(__FILE__) . '/data';
+$file = $dir . '/entries.json';
+if (!is_dir($dir) && !@mkdir($dir, 0755, true)) out(500, array('error' => 'khong_tao_duoc_thu_muc_data'));
+if (!is_writable($dir)) out(500, array('error' => 'thu_muc_data_khong_ghi_duoc'));
 
-$fp = fopen($file, 'c+');
-if (!$fp) out(500, ['error' => 'khong_mo_duoc_file_du_lieu']);
+$fp = @fopen($file, 'c+');
+if (!$fp) out(500, array('error' => 'khong_mo_duoc_file_du_lieu'));
 flock($fp, LOCK_EX);
 $raw  = stream_get_contents($fp);
-$days = json_decode($raw ?: '[]', true);
-if (!is_array($days)) $days = [];
+$days = json_decode($raw ? $raw : '[]', true);
+if (!is_array($days)) $days = array();
 
-function mine($d, $role) { return $role === 'all' || ($d['who'] ?? '') === $role; }
-// Ai cũng xem được bảng của cả 3 người; chỉ thêm, sửa, xóa được phần của mình.
-function visible($days, $role) { return array_values($days); }
+function mine($d, $role) { return $role === 'all' || g($d, 'who', '') === $role; }
+function cut($t, $n) { return function_exists('mb_substr') ? mb_substr($t, 0, $n, 'UTF-8') : substr($t, 0, $n * 3); }
 
 function clean($e, $role) {
-  $s = in_array($e['s'] ?? '', ['win', 'lost', 'idle'], true) ? $e['s'] : 'win';
-  $who = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($e['who'] ?? ''));
+  $s = g($e, 's', '');
+  if (!in_array($s, array('win', 'lost', 'idle'), true)) $s = 'win';
+  $who = preg_replace('/[^A-Za-z0-9_-]/', '', (string)g($e, 'who', ''));
   if ($role !== 'all') $who = $role; // người thường chỉ ghi được cho chính mình
-  return [
-    'id'   => preg_replace('/[^A-Za-z0-9_-]/', '', (string)($e['id'] ?? '')),
+  $date = (string)g($e, 'date', '');
+  return array(
+    'id'   => preg_replace('/[^A-Za-z0-9_-]/', '', (string)g($e, 'id', '')),
     'who'  => $who,
-    'num'  => mb_substr((string)($e['num'] ?? ''), 0, 60),
-    'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $e['date'] ?? '') ? $e['date'] : '',
+    'num'  => cut((string)g($e, 'num', ''), 60),
+    'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $date : '',
     's'    => $s,
-    'src'  => ($e['src'] ?? '') === 'new' ? 'new' : 'cash',
-    'inv'  => (float)($e['inv'] ?? 0),
-    'dt'   => (float)($e['dt'] ?? 0),
-    't'    => (float)($e['t'] ?? 0),
-  ];
+    'src'  => g($e, 'src', '') === 'new' ? 'new' : 'cash',
+    'inv'  => (float)g($e, 'inv', 0),
+    'dt'   => (float)g($e, 'dt', 0),
+    't'    => (float)g($e, 't', 0),
+  );
 }
 
 function save_all($fp, $days) {
   ftruncate($fp, 0); rewind($fp);
-  fwrite($fp, json_encode(array_values($days), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+  fwrite($fp, json_encode(array_values($days)));
   fflush($fp);
 }
 
-$action = $_GET['action'] ?? 'list';
+$action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
 if ($action === 'list') {
   flock($fp, LOCK_UN); fclose($fp);
-  out(200, ['role' => $role, 'days' => visible($days, $role)]);
+  out(200, array('role' => $role, 'days' => array_values($days)));
 }
 
-$body = json_decode(file_get_contents('php://input'), true);
-if (!is_array($body)) out(400, ['error' => 'du_lieu_khong_hop_le']);
-
 if ($action === 'save') {
-  $list = isset($body['entries']) ? $body['entries'] : [$body['entry'] ?? null];
+  $list = isset($body['entries']) ? $body['entries'] : array(g($body, 'entry', null));
   foreach ($list as $e) {
     if (!is_array($e)) continue;
     $c = clean($e, $role);
     if ($c['id'] === '' || $c['who'] === '') continue;
     $found = false;
     foreach ($days as $i => $d) {
-      if (($d['id'] ?? '') === $c['id']) {
+      if (g($d, 'id', '') === $c['id']) {
         if (mine($d, $role)) $days[$i] = $c; // không cho sửa dòng của người khác
         $found = true; break;
       }
@@ -87,12 +97,18 @@ if ($action === 'save') {
   }
   save_all($fp, $days);
 } elseif ($action === 'delete') {
-  $id = (string)($body['id'] ?? '');
-  $days = array_values(array_filter($days, fn($d) => ($d['id'] ?? '') !== $id || !mine($d, $role)));
+  $id = (string)g($body, 'id', '');
+  $keep = array();
+  foreach ($days as $d) {
+    if (g($d, 'id', '') === $id && mine($d, $role)) continue; // chỉ xóa được dòng của mình
+    $keep[] = $d;
+  }
+  $days = $keep;
   save_all($fp, $days);
 } else {
-  out(400, ['error' => 'action_khong_hop_le']);
+  flock($fp, LOCK_UN); fclose($fp);
+  out(400, array('error' => 'action_khong_hop_le'));
 }
 
 flock($fp, LOCK_UN); fclose($fp);
-out(200, ['ok' => true, 'role' => $role, 'days' => visible($days, $role)]);
+out(200, array('ok' => true, 'role' => $role, 'days' => array_values($days)));

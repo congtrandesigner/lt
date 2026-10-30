@@ -219,14 +219,25 @@ let api=null, pass='', role='all';
 const canEdit=who=>role==='all'||role===who;
 try{pass=localStorage.getItem('tinh-von-loi-pass')||''}catch(e){}
 async function apiCall(action,payload){
-  const r=await fetch(api+'?action='+action,{method:payload?'POST':'GET',cache:'no-store',
-    headers:{'X-Pass':pass,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});
-  if(!r.ok) throw {code:r.status};
-  return r.json();
+  let r;
+  try{ r=await fetch(api+'?action='+action,{method:'POST',cache:'no-store',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({...(payload||{}),pass})}); }
+  catch(e){ throw {code:0}; }
+  let j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok||!j) throw {code:r.status||0, err:j&&j.error, php:!j};
+  return j;
 }
+const ERR={khong_tao_duoc_thu_muc_data:'Host không tạo được thư mục data. Anh tạo thư mục data cạnh file api.php.',
+  thu_muc_data_khong_ghi_duoc:'Thư mục data trên host không cho ghi. Anh đặt quyền thư mục data là 755 (hoặc 775).',
+  khong_mo_duoc_file_du_lieu:'Host không mở được file data/entries.json. Anh kiểm tra quyền ghi của thư mục data.'};
+let lastErr='';
 function hostFail(e){
-  if(e&&e.code===401){ $('login').hidden=false; setStatus('Cần nhập mật khẩu để lưu lên host.',true); }
-  else setStatus('Chưa lưu được lên host (mất mạng?). Dữ liệu vẫn giữ trong trình duyệt, tải lại trang khi có mạng.',true);
+  if(e&&e.code===401){ lastErr='Sai mật khẩu, anh nhập lại.'; $('login').hidden=false; setStatus('Cần nhập mật khẩu để lưu lên host.',true); return; }
+  if(e&&e.code===0) lastErr='Không kết nối được tới host. Anh kiểm tra mạng.';
+  else if(e&&e.err&&ERR[e.err]) lastErr=ERR[e.err];
+  else if(e&&e.php) lastErr='File api.php không chạy được trên host (lỗi '+e.code+'). Host cần có PHP, và api.php phải nằm cùng thư mục với index.html.';
+  else lastErr='Host báo lỗi '+(e&&e.code)+'.';
+  setStatus(lastErr,true);
 }
 async function loadHost(first){
   let res;
@@ -249,7 +260,7 @@ function showWho(){
 }
 async function connectHost(){
   $('logout').addEventListener('click',()=>{ try{localStorage.removeItem('tinh-von-loi-pass')}catch(e){} location.reload(); });
-  $('lGo').addEventListener('click',()=>{ pass=$('lPass').value; try{localStorage.setItem('tinh-von-loi-pass',pass)}catch(e){} $('lErr').textContent=''; loadHost(true).then(()=>{ if(!$('login').hidden) $('lErr').textContent='Sai mật khẩu, anh nhập lại.'; }); });
+  $('lGo').addEventListener('click',()=>{ pass=$('lPass').value.trim(); try{localStorage.setItem('tinh-von-loi-pass',pass)}catch(e){} $('lErr').textContent=''; lastErr=''; loadHost(true).then(()=>{ if(!$('login').hidden) $('lErr').textContent=lastErr||'Sai mật khẩu, anh nhập lại.'; }); });
   $('lPass').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();$('lGo').click();} });
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden && $('login').hidden) loadHost(false); });
   if(!pass){ $('login').hidden=false; setStatus('Nhập mật khẩu để xem và lưu dữ liệu trên host.'); return; }
