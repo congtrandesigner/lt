@@ -127,15 +127,19 @@ tr.sumrow td{font-weight:700;border-top:2px solid var(--line)}
     <h1>Tính vốn và lời theo ngày</h1>
     <p class="sub">Đơn vị: nghìn đồng (k). Mỗi nhà đầu tư có bảng và tổng riêng.</p>
     <p class="note" id="store" style="margin:4px 0 0"></p>
-    <p class="note" id="who" style="margin:4px 0 0" hidden>Đang đăng nhập: <b id="whoName"></b> · <button type="button" class="edit" id="logout">Đăng xuất</button></p>
+    <p class="note" id="who" style="margin:4px 0 0" hidden>Đang dùng với tên: <b id="whoName"></b> · <button type="button" class="edit" id="logout">Đổi người</button></p>
   </header>
 
   <section class="panel" id="login" hidden>
-    <div class="form-head"><h2>Nhập mật khẩu để xem dữ liệu</h2></div>
-    <div class="form">
-      <label for="lPass">Mật khẩu<input id="lPass" type="password" class="ptext" autocomplete="current-password"></label>
+    <div class="form-head"><h2>Anh/chị là ai?</h2></div>
+    <p class="note" style="margin:0 0 10px">Chọn tên của mình. Máy này sẽ nhớ, lần sau không cần chọn lại.</p>
+    <div class="row-actions" id="pickWho" style="margin:0">
+      <button type="button" class="primary" data-as="p1">Sơ Kê</button>
+      <button type="button" class="primary" data-as="p2">Đư Cờ</button>
+      <button type="button" class="primary" data-as="p3">Cô Cô</button>
+      <button type="button" data-as="all">Quản lý (cả 3 người)</button>
     </div>
-    <div class="form-actions"><button class="primary" type="button" id="lGo">Vào</button><span class="err" id="lErr" role="alert"></span></div>
+    <p class="err" id="lErr" role="alert" style="margin:10px 0 0"></p>
   </section>
 
   <section class="panel" id="f">
@@ -178,7 +182,7 @@ tr.sumrow td{font-weight:700;border-top:2px solid var(--line)}
   <p class="note"><b>Bỏ thêm tiền mới:</b> số vốn hôm đó là tiền mới bỏ vào, cộng vào tổng vốn. <b>Lấy từ tiền đang có:</b> dùng lại tiền đã thu về, không cộng vào tổng vốn (nếu tiền đang có không đủ thì phần thiếu tính là vốn bỏ thêm).</p>
 </div>
 
-<script>window.HOST_API="api.php";</script>
+<script>window.HOST_API="/api/data";</script>
 <script>
 const $=id=>document.getElementById(id);
 const fmt=n=>(Math.round(n*100)/100).toLocaleString('vi-VN')+'k';
@@ -216,12 +220,14 @@ function persist(){ if(demo) return; try{localStorage.setItem(KEY,JSON.stringify
 const body=d=>({who:d.who,num:d.num||'',date:d.date,s:d.s,src:d.src||'cash',inv:num(d.inv),dt:num(d.dt),t:d.t||0});
 function setStatus(t,bad){const el=$('store'); if(el){el.textContent=t; el.classList.toggle('neg',!!bad);}}
 let api=null, pass='', role='all';
+const ROLES=['all','p1','p2','p3'];
 const canEdit=who=>role==='all'||role===who;
-try{pass=localStorage.getItem('tinh-von-loi-pass')||''}catch(e){}
+try{pass=localStorage.getItem('tinh-von-loi-as')||''}catch(e){}
+if(!ROLES.includes(pass)) pass='';
 async function apiCall(action,payload){
   let r;
   try{ r=await fetch(api+'?action='+action,{method:'POST',cache:'no-store',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({...(payload||{}),pass})}); }
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({...(payload||{}),as:pass})}); }
   catch(e){ throw {code:0}; }
   let j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok||!j) throw {code:r.status||0, err:j&&j.error, php:!j};
@@ -229,10 +235,12 @@ async function apiCall(action,payload){
 }
 const ERR={khong_tao_duoc_thu_muc_data:'Host không tạo được thư mục data. Anh tạo thư mục data cạnh file api.php.',
   thu_muc_data_khong_ghi_duoc:'Thư mục data trên host không cho ghi. Anh đặt quyền thư mục data là 755 (hoặc 775).',
-  khong_mo_duoc_file_du_lieu:'Host không mở được file data/entries.json. Anh kiểm tra quyền ghi của thư mục data.'};
+  khong_mo_duoc_file_du_lieu:'Host không mở được file data/entries.json. Anh kiểm tra quyền ghi của thư mục data.',
+  chua_noi_redis:'Project trên Vercel chưa nối kho lưu trữ. Anh vào tab Storage, thêm Upstash Redis, nối vào project rồi Redeploy.',
+  loi_redis:'Kho lưu trữ trên Vercel đang lỗi, anh thử lại sau ít phút.'};
 let lastErr='';
 function hostFail(e){
-  if(e&&e.code===401){ lastErr='Sai mật khẩu, anh nhập lại.'; $('login').hidden=false; setStatus('Cần nhập mật khẩu để lưu lên host.',true); return; }
+  if(e&&e.code===401){ lastErr='Anh chọn lại tên của mình.'; $('login').hidden=false; setStatus('Chọn tên để xem và lưu dữ liệu.',true); return; }
   if(e&&e.code===0) lastErr='Không kết nối được tới host. Anh kiểm tra mạng.';
   else if(e&&e.err&&ERR[e.err]) lastErr=ERR[e.err];
   else if(e&&e.php) lastErr='File api.php không chạy được trên host (lỗi '+e.code+'). Host cần có PHP, và api.php phải nằm cùng thư mục với index.html.';
@@ -254,16 +262,20 @@ async function loadHost(first){
   showWho();
 }
 function showWho(){
-  const el=$('who'); if(!el) return;
+  const el=$('who'); if(!el||pass==='all') return;
   el.hidden=false;
   $('whoName').textContent=role==='all'?'Quản lý (sửa được cả 3 người)':nameOf(role)+' (chỉ thêm, sửa, xóa phần của mình)';
 }
 async function connectHost(){
-  $('logout').addEventListener('click',()=>{ try{localStorage.removeItem('tinh-von-loi-pass')}catch(e){} location.reload(); });
-  $('lGo').addEventListener('click',()=>{ pass=$('lPass').value.trim(); try{localStorage.setItem('tinh-von-loi-pass',pass)}catch(e){} $('lErr').textContent=''; lastErr=''; loadHost(true).then(()=>{ if(!$('login').hidden) $('lErr').textContent=lastErr||'Sai mật khẩu, anh nhập lại.'; }); });
-  $('lPass').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();$('lGo').click();} });
+  $('logout').addEventListener('click',()=>{ try{localStorage.removeItem('tinh-von-loi-as')}catch(e){} location.reload(); });
+  $('pickWho').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+    pass=btn.dataset.as; try{localStorage.setItem('tinh-von-loi-as',pass)}catch(e){} $('lErr').textContent=''; lastErr='';
+    $('login').hidden=true;
+    loadHost(true).then(()=>{ if(lastErr){ $('login').hidden=false; $('lErr').textContent=lastErr; } });
+  }));
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden && $('login').hidden) loadHost(false); });
-  if(!pass){ $('login').hidden=false; setStatus('Nhập mật khẩu để xem và lưu dữ liệu trên host.'); return; }
+  pass='all'; // không cần mật khẩu: ai mở link cũng xem và sửa được
+  if(!pass){ $('login').hidden=false; setStatus('Chọn tên để xem và lưu dữ liệu.'); return; }
   await loadHost(true);
 }
 async function writeEntry(d){
