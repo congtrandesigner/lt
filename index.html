@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tính Vốn Lời</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: một cột hẹp — thiết lập ở trên, bảng từng ngày ở giữa, tổng kết ở dưới */
+:root{
+  --bg:#f3f5f2; --card:#ffffff; --fg:#17201b; --muted:#5d6b63; --line:#d9e0db;
+  --accent:#0f7a52; --accent-soft:#e2f1ea; --warn:#b3401f; --warn-soft:#fbe9e3; --idle:#eef0ee;
+  --sans:"Be Vietnam Pro",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111613; --card:#1a211d; --fg:#e7ede9; --muted:#9aa8a0; --line:#2c3630;
+  --accent:#4cc38e; --accent-soft:#16332a; --warn:#f08a6a; --warn-soft:#3a201a; --idle:#222a25; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111613; --card:#1a211d; --fg:#e7ede9; --muted:#9aa8a0; --line:#2c3630;
+  --accent:#4cc38e; --accent-soft:#16332a; --warn:#f08a6a; --warn-soft:#3a201a; --idle:#222a25; color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding-block:24px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:18px}
+h1{font-size:1.6rem;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted);font-weight:500}
+input[type=number],select{font:600 1rem var(--mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);
+  border-radius:6px;padding:8px 10px;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
+select{font-family:var(--sans);font-size:.88rem;cursor:pointer}
+input:disabled{opacity:.45}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ratio{margin:12px 0 0;font-size:.88rem;color:var(--muted)}
+.ratio b{color:var(--accent);font-family:var(--mono)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:820px;font-variant-numeric:tabular-nums}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
+td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-size:.92rem;white-space:nowrap}
+td:first-child{font-family:var(--sans);font-weight:600}
+input.date{font:500 .88rem var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:145px}
+td input[type=number]{width:100px;padding:6px 8px;font-size:.9rem;text-align:right}
+td select{width:150px;padding:6px 8px}
+td input.auto{color:var(--muted)}
+tr.lost td:first-child{box-shadow:inset 3px 0 var(--warn)}
+tr.lost{background:var(--warn-soft)}
+tr.idle{background:var(--idle)}
+tr.win td:first-child{box-shadow:inset 3px 0 var(--accent)}
+.pos{color:var(--accent)} .neg{color:var(--warn)}
+.row-actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+button{font:600 .9rem var(--sans);border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.total{background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.total.down{background:var(--warn-soft);border-color:var(--warn)}
+.big{font:700 2rem var(--mono);color:var(--accent);margin:0}
+.total.down .big{color:var(--warn)}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.sum div{display:flex;flex-direction:column}
+.sum span{font-size:.78rem;color:var(--muted)}
+.sum b{font-family:var(--mono);font-size:1.05rem}
+.note{font-size:.84rem;color:var(--muted);margin:10px 0 0}
+.note ul{margin:4px 0 0;padding-left:18px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+button.del{padding:4px 10px;font-size:.82rem;color:var(--warn);background:transparent;border-color:var(--line)}
+button.del:hover{border-color:var(--warn)}
+.empty td{text-align:center;color:var(--muted);font-family:var(--sans);padding:18px}
+.warn-msg{color:var(--warn);font-size:.85rem;margin:0}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:end}
+.form input[type=date]{font:500 .95rem var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;box-sizing:border-box}
+.form-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.form-head h2,.list-head h2{font-size:1.05rem;margin:0}
+.editing .form-head h2{color:var(--accent)}
+.form-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.err{color:var(--warn);font-size:.85rem}
+.list-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+td .acts{display:flex;gap:6px;justify-content:flex-end}
+button.edit{padding:4px 10px;font-size:.82rem;color:var(--accent);background:transparent}
+button.edit:hover{border-color:var(--accent)}
+tr.cur{outline:2px solid var(--accent);outline-offset:-2px}
+.tag{display:inline-block;font:600 .75rem var(--sans);padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+tr.lost .tag{background:var(--warn-soft);color:var(--warn)}
+tr.idle .tag{background:var(--idle);color:var(--muted)}
+.demo{font-size:.84rem;color:var(--muted);background:var(--idle);border-radius:6px;padding:8px 10px;margin:0 0 10px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Tính vốn và lời theo ngày</h1>
+    <p class="sub">Đơn vị: nghìn đồng (k).</p>
+  </header>
+
+  <section class="panel" id="f">
+    <div class="form-head"><h2 id="fTitle">Nhập ngày mới</h2></div>
+    <div class="form">
+      <label for="fDate">Ngày<input id="fDate" type="date" required></label>
+      <label for="fStatus">Tình trạng
+        <select id="fStatus"><option value="win">Có doanh thu</option><option value="lost">Mất vốn</option><option value="idle">Không đầu tư</option></select></label>
+      <label for="fInv">Vốn đầu tư (k)<input id="fInv" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+      <label for="fDt">Doanh thu (k)<input id="fDt" type="number" min="0" step="any" inputmode="decimal"></label>
+    </div>
+    <div class="form-actions">
+      <button class="primary" type="button" id="fSave">Lưu</button>
+      <button type="button" id="fCancel" hidden>Hủy sửa</button>
+      <span class="err" id="fErr" role="alert"></span>
+      <span class="note" id="fOk" style="margin:0"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="list-head">
+      <h2>Các ngày đã lưu</h2>
+      <div class="row-actions" style="margin:0">
+        <button id="png" type="button">Tải ảnh PNG</button>
+        <button id="reset" type="button">Xóa hết</button>
+      </div>
+    </div>
+    <p class="demo" id="demo" hidden>Đây là số ví dụ. Bấm “Xóa hết” để bắt đầu nhập số của anh.</p>
+    <div id="confirmBox" class="demo" hidden>Xóa toàn bộ các ngày đã lưu? <button type="button" id="yesClear" class="del">Xóa hết</button> <button type="button" id="noClear">Thôi</button></div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Ngày</th><th>Tình trạng</th><th>Vốn đầu tư</th><th>Doanh thu</th><th>Lời / lỗ</th><th>Vốn bỏ thêm</th><th>Tiền đang có</th><th><span class="sr">Sửa, xóa</span></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="note" id="pngMsg" style="margin:8px 0 0"></p>
+    <p class="note">Vốn bỏ thêm tự tính: ngày nào vốn đầu tư lớn hơn tiền đang có thì phần thiếu là vốn anh bỏ thêm từ túi.</p>
+  </section>
+
+  <section class="total" id="totalBox" aria-live="polite">
+    <span style="font-size:.85rem;font-weight:600">Tổng cần rút về (cả vốn lẫn lời)</span>
+    <p class="big" id="final">–</p>
+    <div class="sum">
+      <div><span>Tổng vốn anh bỏ ra</span><b id="sVon">–</b></div>
+      <div><span>Lời / lỗ thực tế</span><b id="sLoi">–</b></div>
+      <div><span>Ngày có doanh thu</span><b id="sWin">–</b></div>
+      <div><span>Ngày mất vốn</span><b id="sLost">–</b></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>(Math.round(n*100)/100).toLocaleString('vi-VN')+'k';
+const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n};
+const iso=dt=>{const z=new Date(dt.getTime()-dt.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
+const nextDay=v=>{const t=new Date(v+'T12:00:00');t.setDate(t.getDate()+1);return iso(t)};
+const vnDate=v=>v?v.split('-').reverse().join('/'):'—';
+const LABEL={win:'Có doanh thu',lost:'Mất vốn',idle:'Không đầu tư'};
+const KEY='tinh-von-loi-v1';
+const OUT={rows:[]};
+let uid=1, editId=null, demo=false;
+let days=[];
+
+// Nạp dữ liệu đã lưu trong trình duyệt; chưa có thì hiện số ví dụ
+try{const raw=localStorage.getItem(KEY); if(raw){days=JSON.parse(raw)}}catch(e){}
+if(!Array.isArray(days)||!days.length){
+  demo=true;
+  const ex=[['win',162,294],['win',162,294],['idle',0,0],['lost',162,0],['win',212,385]];
+  days=ex.map(([s,inv,dt],i)=>{const t=new Date();t.setDate(t.getDate()-(ex.length-1-i));return {s,inv,dt,date:iso(t)}});
+}
+days.forEach(d=>d.id=uid++);
+function persist(){ if(demo) return; try{localStorage.setItem(KEY,JSON.stringify(days.map(({id,...r})=>r)))}catch(e){} }
+function leaveDemo(){ if(demo){demo=false;days=[];} }
+
+function sorted(){return [...days].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id-b.id)}
+
+function render(){
+  const tb=$('rows');tb.innerHTML='';
+  $('demo').hidden=!demo;
+  let cash=0,totalIn=0,win=0,lost=0; OUT.rows=[];
+  const list=sorted();
+  if(!list.length) tb.innerHTML='<tr class="empty"><td colspan="8">Chưa có ngày nào. Nhập ở form phía trên rồi bấm Lưu.</td></tr>';
+  list.forEach(d=>{
+    const inv=d.s==='idle'?0:num(d.inv), dt=d.s==='win'?num(d.dt):0;
+    if(d.s==='win')win++; if(d.s==='lost')lost++;
+    const need=Math.max(0,inv-cash); cash+=need; totalIn+=need;
+    const pl=dt-inv; cash+=pl;
+    OUT.rows.push({date:d.date,s:d.s,inv,dt,pl,need,cash});
+    const tr=document.createElement('tr');tr.className=d.s+(d.id===editId?' cur':'');
+    const plTxt=d.s==='idle'?'—':(pl>=0?'+':'')+fmt(pl);
+    tr.innerHTML=`<td>${vnDate(d.date)}</td><td><span class="tag">${LABEL[d.s]}</span></td>
+      <td>${d.s==='idle'?'—':fmt(inv)}</td><td>${d.s==='win'?fmt(dt):'—'}</td>
+      <td class="${pl>0?'pos':pl<0?'neg':''}">${plTxt}</td><td>${need>0?fmt(need):'—'}</td><td><b>${fmt(cash)}</b></td>
+      <td><div class="acts"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xóa</button></div></td>`;
+    tr.querySelector('.edit').addEventListener('click',()=>startEdit(d.id));
+    tr.querySelector('.del').addEventListener('click',()=>{
+      days=days.filter(x=>x.id!==d.id); if(editId===d.id) resetForm(); persist(); render();
+    });
+    tb.appendChild(tr);
+  });
+  Object.assign(OUT,{cash,totalIn,win,lost});
+  const pl=cash-totalIn;
+  $('final').textContent=fmt(cash);
+  $('sVon').textContent=fmt(totalIn);
+  const sl=$('sLoi'); sl.textContent=(pl>=0?'+':'')+fmt(pl); sl.className=pl>=0?'pos':'neg';
+  $('sWin').textContent=win; $('sLost').textContent=lost;
+  $('totalBox').classList.toggle('down',pl<0);
+}
+
+function syncFields(){
+  const s=$('fStatus').value;
+  $('fInv').disabled=s==='idle'; $('fDt').disabled=s!=='win';
+  if(s==='idle'){$('fInv').value='';}
+  if(s!=='win'){$('fDt').value='';}
+}
+function resetForm(){
+  editId=null; $('f').classList.remove('editing');
+  $('fTitle').textContent='Nhập ngày mới'; $('fSave').textContent='Lưu'; $('fCancel').hidden=true; $('fErr').textContent='';
+  const list=demo?[]:sorted(); const last=list[list.length-1];
+  $('fDate').value=last&&last.date?nextDay(last.date):iso(new Date());
+  $('fStatus').value='win';
+  const lastInv=[...list].reverse().find(d=>d.s!=='idle'&&d.inv);
+  $('fInv').value=lastInv?lastInv.inv:''; $('fDt').value='';
+  syncFields();
+}
+function startEdit(id){
+  const d=days.find(x=>x.id===id); if(!d) return;
+  editId=id; $('f').classList.add('editing');
+  $('fTitle').textContent='Sửa ngày '+vnDate(d.date); $('fSave').textContent='Cập nhật'; $('fCancel').hidden=false; $('fErr').textContent='';
+  $('fDate').value=d.date||''; $('fStatus').value=d.s;
+  $('fInv').value=d.s==='idle'?'':d.inv; $('fDt').value=d.s==='win'?d.dt:'';
+  syncFields(); render();
+  $('f').scrollIntoView({behavior:'smooth',block:'start'}); $('fInv').focus({preventScroll:true});
+}
+
+$('fStatus').addEventListener('change',syncFields);
+$('fCancel').addEventListener('click',()=>{resetForm();render()});
+$('f').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();save();} });
+$('fSave').addEventListener('click',save);
+function save(){
+  $('fOk').textContent='';
+  const s=$('fStatus').value, date=$('fDate').value;
+  const inv=$('fInv').value, dt=$('fDt').value;
+  if(!date){$('fErr').textContent='Anh chọn ngày trước khi lưu.';return}
+  if(s!=='idle'&&inv!==''&&num(inv)<0){$('fErr').textContent='Vốn đầu tư không được âm.';$('fInv').focus();return}
+  if(s==='win'&&dt===''){$('fErr').textContent='Anh nhập doanh thu thu về. Nếu không thu được gì thì chọn "Mất vốn".';$('fDt').focus();return}
+  const rec={date,s,inv:s==='idle'?0:num(inv),dt:s==='win'?num(dt):0};
+  if(editId!==null){
+    Object.assign(days.find(x=>x.id===editId),rec);
+  }else{
+    leaveDemo(); days.push({...rec,id:uid++});
+  }
+  const wasEdit=editId!==null;
+  persist(); resetForm(); render();
+  $('fOk').textContent=(wasEdit?'Đã cập nhật ngày ':'Đã lưu ngày ')+vnDate(date)+'.';
+}
+
+$('reset').addEventListener('click',()=>{$('confirmBox').hidden=false});
+$('noClear').addEventListener('click',()=>{$('confirmBox').hidden=true});
+$('yesClear').addEventListener('click',()=>{
+  $('confirmBox').hidden=true; demo=false; days=[]; persist(); resetForm(); render();
+});
+
+async function makePng(){
+  try{await document.fonts.ready}catch(e){}
+  const W=900,rowH=34,top=150,n=OUT.rows.length;
+  const H=top+rowH*(n+1)+190, sc=2;
+  const c=document.createElement('canvas');c.width=W*sc;c.height=H*sc;
+  const g=c.getContext('2d');g.scale(sc,sc);
+  const F='"Be Vietnam Pro",system-ui,sans-serif', M='"JetBrains Mono",ui-monospace,monospace';
+  const C={bg:'#f3f5f2',card:'#ffffff',fg:'#17201b',mu:'#5d6b63',ln:'#d9e0db',ac:'#0f7a52',acs:'#e2f1ea',wa:'#b3401f',was:'#fbe9e3',id:'#eef0ee'};
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H);
+  g.fillStyle=C.fg;g.font='700 26px '+F;g.fillText('Tính vốn và lời theo ngày',32,52);
+  g.fillStyle=C.mu;g.font='400 14px '+F;
+  const ds=OUT.rows.map(r=>r.date).filter(Boolean);
+  g.fillText('Đơn vị: nghìn đồng (k)'+(ds.length?`  ·  Từ ${vnDate(ds[0])} đến ${vnDate(ds[ds.length-1])}`:''),32,80);
+  const cols=[['Ngày',32,'l'],['Tình trạng',150,'l'],['Vốn đầu tư',380,'r'],['Doanh thu',490,'r'],['Lời / lỗ',610,'r'],['Vốn bỏ thêm',735,'r'],['Tiền đang có',868,'r']];
+  g.fillStyle=C.card;g.fillRect(16,top-38,W-32,rowH*(n+1)+16);
+  g.font='600 11px '+F;g.fillStyle=C.mu;
+  cols.forEach(([t,x,a])=>{g.textAlign=a==='r'?'right':'left';g.fillText(t.toUpperCase(),x,top-14)});
+  OUT.rows.forEach((r,i)=>{
+    const y=top+i*rowH;
+    if(r.s!=='win'){g.fillStyle=r.s==='lost'?C.was:C.id;g.fillRect(16,y-4,W-32,rowH)}
+    g.fillStyle=r.s==='lost'?C.wa:r.s==='win'?C.ac:C.ln;g.fillRect(16,y-4,3,rowH);
+    g.strokeStyle=C.ln;g.beginPath();g.moveTo(16,y-4);g.lineTo(W-16,y-4);g.stroke();
+    const ty=y+18;
+    g.textAlign='left';g.fillStyle=C.fg;g.font='600 14px '+F;g.fillText(vnDate(r.date),32,ty);
+    g.font='400 14px '+F;g.fillText(LABEL[r.s],150,ty);
+    g.textAlign='right';g.font='500 14px '+M;
+    const idle=r.s==='idle';
+    g.fillStyle=C.fg;g.fillText(idle?'—':fmt(r.inv),380,ty);g.fillText(r.s==='win'?fmt(r.dt):'—',490,ty);
+    g.fillStyle=r.pl>0?C.ac:r.pl<0?C.wa:C.mu;g.fillText(idle?'—':(r.pl>=0?'+':'')+fmt(r.pl),610,ty);
+    g.fillStyle=C.fg;g.fillText(r.need>0?fmt(r.need):'—',735,ty);
+    g.font='600 14px '+M;g.fillText(fmt(r.cash),868,ty);
+  });
+  const by=top+rowH*n+30, pl=OUT.cash-OUT.totalIn, down=pl<0;
+  g.fillStyle=down?C.was:C.acs;g.fillRect(16,by,W-32,140);
+  g.strokeStyle=down?C.wa:C.ac;g.strokeRect(16.5,by+.5,W-33,139);
+  g.textAlign='left';g.fillStyle=C.fg;g.font='600 14px '+F;g.fillText('Tổng cần rút về (cả vốn lẫn lời)',36,by+30);
+  g.fillStyle=down?C.wa:C.ac;g.font='700 34px '+M;g.fillText(fmt(OUT.cash),36,by+72);
+  const S=[['Tổng vốn bỏ ra',fmt(OUT.totalIn),C.fg],['Lời / lỗ thực tế',(pl>=0?'+':'')+fmt(pl),pl>=0?C.ac:C.wa],['Ngày có doanh thu',String(OUT.win),C.fg],['Ngày mất vốn',String(OUT.lost),C.fg]];
+  S.forEach(([k,v,col],j)=>{const x=36+j*210;g.fillStyle=C.mu;g.font='400 12px '+F;g.fillText(k,x,by+102);g.fillStyle=col;g.font='600 16px '+M;g.fillText(v,x,by+124)});
+  return await new Promise(res=>c.toBlob(res,'image/png'));
+}
+let dl=null;
+(async()=>{try{dl=await window.claude?.use?.('downloads')}catch(e){}})();
+$('png').addEventListener('click',async()=>{
+  const msg=$('pngMsg');msg.textContent='';
+  if(!OUT.rows.length){msg.textContent='Chưa có ngày nào để xuất.';return}
+  const blob=await makePng(); const name='von-loi-'+iso(new Date())+'.png';
+  if(dl){
+    try{await dl.save({filename:name,data:blob});msg.textContent='Đã lưu ảnh.'}
+    catch(e){msg.textContent=e&&e.code==='declined'?'Đã hủy lưu ảnh.':'Không lưu được ảnh ở đây. Anh mở file HTML trên máy để tải.'}
+  }else{
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }
+});
+
+resetForm(); render();
+</script>
+</body>
+</html>
