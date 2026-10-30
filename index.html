@@ -100,6 +100,8 @@ tr.idle .tag{background:var(--idle);color:var(--muted)}
       <label for="fDate">Ngày<input id="fDate" type="date" required></label>
       <label for="fStatus">Tình trạng
         <select id="fStatus"><option value="win">Có doanh thu</option><option value="lost">Mất vốn</option><option value="idle">Không đầu tư</option></select></label>
+      <label for="fSrc">Vốn lấy từ đâu
+        <select id="fSrc"><option value="new">Bỏ thêm tiền mới từ túi</option><option value="cash">Lấy từ tiền đang có</option></select></label>
       <label for="fInv">Vốn đầu tư (k)<input id="fInv" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
       <label for="fDt">Doanh thu (k)<input id="fDt" type="number" min="0" step="any" inputmode="decimal"></label>
     </div>
@@ -128,7 +130,7 @@ tr.idle .tag{background:var(--idle);color:var(--muted)}
       </table>
     </div>
     <p class="note" id="pngMsg" style="margin:8px 0 0"></p>
-    <p class="note">Vốn bỏ thêm tự tính: ngày nào vốn đầu tư lớn hơn tiền đang có thì phần thiếu là vốn anh bỏ thêm từ túi.</p>
+    <p class="note"><b>Bỏ thêm tiền mới:</b> số vốn hôm đó là tiền mới anh bỏ vào, cộng vào tổng vốn. <b>Lấy từ tiền đang có:</b> dùng lại tiền đã thu về, không cộng vào tổng vốn (nếu tiền đang có không đủ thì phần thiếu tính là vốn bỏ thêm).</p>
   </section>
 
   <section class="total" id="totalBox" aria-live="polite">
@@ -160,8 +162,8 @@ let days=[];
 try{const raw=localStorage.getItem(KEY); if(raw){days=JSON.parse(raw)}}catch(e){}
 if(!Array.isArray(days)||!days.length){
   demo=true;
-  const ex=[['win',162,294],['win',162,294],['idle',0,0],['lost',162,0],['win',212,385]];
-  days=ex.map(([s,inv,dt],i)=>{const t=new Date();t.setDate(t.getDate()-(ex.length-1-i));return {s,inv,dt,date:iso(t)}});
+  const ex=[['win',162,294,'new'],['win',162,294,'new'],['idle',0,0,'cash'],['lost',162,0,'cash'],['win',162,294,'cash']];
+  days=ex.map(([s,inv,dt,src],i)=>{const t=new Date();t.setDate(t.getDate()-(ex.length-1-i));return {s,inv,dt,src,date:iso(t)}});
 }
 days.forEach(d=>d.id=uid++);
 function persist(){ if(demo) return; try{localStorage.setItem(KEY,JSON.stringify(days.map(({id,...r})=>r)))}catch(e){} }
@@ -178,7 +180,9 @@ function render(){
   list.forEach(d=>{
     const inv=d.s==='idle'?0:num(d.inv), dt=d.s==='win'?num(d.dt):0;
     if(d.s==='win')win++; if(d.s==='lost')lost++;
-    const need=Math.max(0,inv-cash); cash+=need; totalIn+=need;
+    const fresh=d.s!=='idle'&&d.src==='new'?inv:0; cash+=fresh; totalIn+=fresh;
+    const short=Math.max(0,inv-cash); cash+=short; totalIn+=short;
+    const need=fresh+short;
     const pl=dt-inv; cash+=pl;
     OUT.rows.push({date:d.date,s:d.s,inv,dt,pl,need,cash});
     const tr=document.createElement('tr');tr.className=d.s+(d.id===editId?' cur':'');
@@ -204,7 +208,7 @@ function render(){
 
 function syncFields(){
   const s=$('fStatus').value;
-  $('fInv').disabled=s==='idle'; $('fDt').disabled=s!=='win';
+  $('fInv').disabled=s==='idle'; $('fSrc').disabled=s==='idle'; $('fDt').disabled=s!=='win';
   if(s==='idle'){$('fInv').value='';}
   if(s!=='win'){$('fDt').value='';}
 }
@@ -216,6 +220,7 @@ function resetForm(){
   $('fStatus').value='win';
   const lastInv=[...list].reverse().find(d=>d.s!=='idle'&&d.inv);
   $('fInv').value=lastInv?lastInv.inv:''; $('fDt').value='';
+  $('fSrc').value=lastInv&&lastInv.src?lastInv.src:'new';
   syncFields();
 }
 function startEdit(id){
@@ -224,6 +229,7 @@ function startEdit(id){
   $('fTitle').textContent='Sửa ngày '+vnDate(d.date); $('fSave').textContent='Cập nhật'; $('fCancel').hidden=false; $('fErr').textContent='';
   $('fDate').value=d.date||''; $('fStatus').value=d.s;
   $('fInv').value=d.s==='idle'?'':d.inv; $('fDt').value=d.s==='win'?d.dt:'';
+  $('fSrc').value=d.src||'cash';
   syncFields(); render();
   $('f').scrollIntoView({behavior:'smooth',block:'start'}); $('fInv').focus({preventScroll:true});
 }
@@ -239,7 +245,7 @@ function save(){
   if(!date){$('fErr').textContent='Anh chọn ngày trước khi lưu.';return}
   if(s!=='idle'&&inv!==''&&num(inv)<0){$('fErr').textContent='Vốn đầu tư không được âm.';$('fInv').focus();return}
   if(s==='win'&&dt===''){$('fErr').textContent='Anh nhập doanh thu thu về. Nếu không thu được gì thì chọn "Mất vốn".';$('fDt').focus();return}
-  const rec={date,s,inv:s==='idle'?0:num(inv),dt:s==='win'?num(dt):0};
+  const rec={date,s,src:$('fSrc').value,inv:s==='idle'?0:num(inv),dt:s==='win'?num(dt):0};
   if(editId!==null){
     Object.assign(days.find(x=>x.id===editId),rec);
   }else{
