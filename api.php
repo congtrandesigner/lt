@@ -7,7 +7,7 @@ $USERS = [
   'muadong' => 'all',
   'soke'   => 'p1',
   'duco'   => 'p2',
-  'muadong'   => 'p3',
+  'muadong2'   => 'p3',
 ];
 // ==============================
 
