@@ -126,7 +126,17 @@ tr.sumrow td{font-weight:700;border-top:2px solid var(--line)}
   <header>
     <h1>Tính vốn và lời theo ngày</h1>
     <p class="sub">Đơn vị: nghìn đồng (k). Mỗi nhà đầu tư có bảng và tổng riêng.</p>
+    <p class="note" id="store" style="margin:4px 0 0"></p>
+    <p class="note" id="who" style="margin:4px 0 0" hidden>Đang đăng nhập: <b id="whoName"></b> · <button type="button" class="edit" id="logout">Đăng xuất</button></p>
   </header>
+
+  <section class="panel" id="login" hidden>
+    <div class="form-head"><h2>Nhập mật khẩu để xem dữ liệu</h2></div>
+    <div class="form">
+      <label for="lPass">Mật khẩu<input id="lPass" type="password" class="ptext" autocomplete="current-password"></label>
+    </div>
+    <div class="form-actions"><button class="primary" type="button" id="lGo">Vào</button><span class="err" id="lErr" role="alert"></span></div>
+  </section>
 
   <section class="panel" id="f">
     <div class="form-head"><h2 id="fTitle">Nhập ngày mới</h2></div>
@@ -168,6 +178,7 @@ tr.sumrow td{font-weight:700;border-top:2px solid var(--line)}
   <p class="note"><b>Bỏ thêm tiền mới:</b> số vốn hôm đó là tiền mới bỏ vào, cộng vào tổng vốn. <b>Lấy từ tiền đang có:</b> dùng lại tiền đã thu về, không cộng vào tổng vốn (nếu tiền đang có không đủ thì phần thiếu tính là vốn bỏ thêm).</p>
 </div>
 
+<script>window.HOST_API="api.php";</script>
 <script>
 const $=id=>document.getElementById(id);
 const fmt=n=>(Math.round(n*100)/100).toLocaleString('vi-VN')+'k';
@@ -179,7 +190,8 @@ const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const LABEL={win:'Có doanh thu',lost:'Mất vốn',idle:'Không đầu tư'};
 const DOTS=['#0f7a52','#2f5fb3','#b0601c','#7a3fa0','#a33a5a','#3a8a8a'];
 const KEY='tinh-von-loi-v2', OLDKEY='tinh-von-loi-v1';
-let uid=1, editId=null, demo=false, tab=null;
+let editId=null, demo=false, tab=null, col=null;
+const newId=()=>'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 try{tab=localStorage.getItem('tinh-von-loi-tab')}catch(e){}
 let people=[], days=[];
 
@@ -198,14 +210,81 @@ if(!days.length){
             ['p3','win',162,294,'new',2],['p3','idle',0,0,'cash',1],['p3','win',162,294,'cash',0]];
   days=ex.map(([who,s,inv,dt,src,back])=>{const t=new Date();t.setDate(t.getDate()-back);return {who,s,inv,dt,src,date:iso(t)}});
 }
-days.forEach(d=>d.id=uid++);
-function persist(){ if(demo){ try{localStorage.setItem(KEY,JSON.stringify({people,days:[]}))}catch(e){} return; }
-  try{localStorage.setItem(KEY,JSON.stringify({people,days:days.map(({id,...r})=>r)}))}catch(e){} }
+days.forEach((d,i)=>{ if(!d.id) d.id=newId()+i; if(d.t==null) d.t=i; });
+// Bản sao trong trình duyệt (dự phòng)
+function persist(){ if(demo) return; try{localStorage.setItem(KEY,JSON.stringify({people,days}))}catch(e){} }
+const body=d=>({who:d.who,num:d.num||'',date:d.date,s:d.s,src:d.src||'cash',inv:num(d.inv),dt:num(d.dt),t:d.t||0});
+function setStatus(t,bad){const el=$('store'); if(el){el.textContent=t; el.classList.toggle('neg',!!bad);}}
+let api=null, pass='', role='all';
+const canEdit=who=>role==='all'||role===who;
+try{pass=localStorage.getItem('tinh-von-loi-pass')||''}catch(e){}
+async function apiCall(action,payload){
+  const r=await fetch(api+'?action='+action,{method:payload?'POST':'GET',cache:'no-store',
+    headers:{'X-Pass':pass,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});
+  if(!r.ok) throw {code:r.status};
+  return r.json();
+}
+function hostFail(e){
+  if(e&&e.code===401){ $('login').hidden=false; setStatus('Cần nhập mật khẩu để lưu lên host.',true); }
+  else setStatus('Chưa lưu được lên host (mất mạng?). Dữ liệu vẫn giữ trong trình duyệt, tải lại trang khi có mạng.',true);
+}
+async function loadHost(first){
+  let res;
+  try{ res=await apiCall('list'); }catch(e){ hostFail(e); return; }
+  $('login').hidden=true;
+  const newRole=res.role||'all';
+  if(first && !res.days.length && !demo && days.length){
+    const mineLocal=days.filter(d=>newRole==='all'||d.who===newRole);
+    if(mineLocal.length){ try{ res=await apiCall('save',{entries:mineLocal.map(d=>({id:d.id,...body(d)}))}); }catch(e){ hostFail(e); return; } }
+  }
+  if(newRole!==role||first){ role=newRole; if(role!=='all'){ tab=role; } renderSelect(); if(editId===null) resetForm(); }
+  if(res.days.length||!demo){ days=res.days; demo=false; persist(); if(editId&&!days.some(d=>d.id===editId)) resetForm(); render(); }
+  setStatus('Dữ liệu lưu trên host, máy nào mở cũng thấy.');
+  showWho();
+}
+function showWho(){
+  const el=$('who'); if(!el) return;
+  el.hidden=false;
+  $('whoName').textContent=role==='all'?'Quản lý (sửa được cả 3 người)':nameOf(role)+' (chỉ thêm, sửa, xóa phần của mình)';
+}
+async function connectHost(){
+  $('logout').addEventListener('click',()=>{ try{localStorage.removeItem('tinh-von-loi-pass')}catch(e){} location.reload(); });
+  $('lGo').addEventListener('click',()=>{ pass=$('lPass').value; try{localStorage.setItem('tinh-von-loi-pass',pass)}catch(e){} $('lErr').textContent=''; loadHost(true).then(()=>{ if(!$('login').hidden) $('lErr').textContent='Sai mật khẩu, anh nhập lại.'; }); });
+  $('lPass').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();$('lGo').click();} });
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && $('login').hidden) loadHost(false); });
+  if(!pass){ $('login').hidden=false; setStatus('Nhập mật khẩu để xem và lưu dữ liệu trên host.'); return; }
+  await loadHost(true);
+}
+async function writeEntry(d){
+  if(api){ try{ await apiCall('save',{entry:{id:d.id,...body(d)}}); setStatus('Dữ liệu lưu trên host, máy nào mở cũng thấy.'); return true }catch(e){ hostFail(e); return false } }
+  if(!col) return true; try{await col.doc(d.id).set(body(d)); return true}catch(e){ setStatus('Chưa lưu được lên tài khoản, dữ liệu vẫn giữ trong trình duyệt này.',true); return false } }
+async function removeEntry(id){
+  if(api){ try{ await apiCall('delete',{id}) }catch(e){ hostFail(e) } return; }
+  if(!col) return; try{await col.doc(id).delete()}catch(e){ setStatus('Chưa xóa được trên tài khoản, thử lại sau.',true) } }
+async function connectDb(){
+  if(window.HOST_API){ api=window.HOST_API; return connectHost(); }
+  let db=null; try{ db=await window.claude?.use?.('db') }catch(e){}
+  if(!db){ setStatus('Dữ liệu lưu trong trình duyệt này. Đóng mở lại vẫn còn.'); return; }
+  col=db.collection('entries');
+  try{
+    const first=await col.get();
+    if(!first.docs.length && !demo && days.length){
+      setStatus('Đang chuyển dữ liệu cũ lên tài khoản…');
+      for(const d of days){ await col.doc(d.id).set(body(d)); }
+    }
+  }catch(e){}
+  col.onSnapshot(snap=>{
+    if(!snap.docs.length && demo){ setStatus('Dữ liệu lưu trên tài khoản Claude, tải lại trang không mất.'); return; }
+    days=snap.docs.map(x=>({id:x.id,...x.data()}));
+    demo=false; persist(); render();
+    setStatus('Dữ liệu lưu trên tài khoản Claude, tải lại trang không mất.');
+  },()=>setStatus('Mất kết nối lưu trữ, dữ liệu vẫn giữ trong trình duyệt này.',true));
+}
 const nameOf=id=>(people.find(p=>p.id===id)||{}).name||'(đã xóa)';
 const color=id=>DOTS[Math.max(0,people.findIndex(p=>p.id===id))%DOTS.length];
 
 function compute(who){
-  const list=days.filter(d=>d.who===who).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id-b.id);
+  const list=days.filter(d=>d.who===who).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.t||0)-(b.t||0));
   let cash=0,totalIn=0,win=0,lost=0; const rows=[];
   list.forEach(d=>{
     const inv=d.s==='idle'?0:num(d.inv), dt=d.s==='win'?num(d.dt):0;
@@ -220,10 +299,13 @@ function compute(who){
 
 function renderSelect(){
   const sel=$('fWho'), cur=sel.value;
-  sel.innerHTML=people.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  if(people.some(p=>p.id===cur)) sel.value=cur;
+  const allowed=people.filter(p=>canEdit(p.id));
+  sel.disabled=allowed.length<2;
+  sel.innerHTML=allowed.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  if(allowed.some(p=>p.id===cur)) sel.value=cur;
 }
 
+function keepTab(){try{localStorage.setItem('tinh-von-loi-tab',tab)}catch(e){}}
 function render(){
   $('demo').hidden=!demo;
   const ov=$('ov'); ov.innerHTML='';
@@ -252,7 +334,7 @@ function render(){
       rowsHtml+=`<tr class="${r.s}${d.id===editId?' cur':''}" data-id="${d.id}"><td><span class="dfull">${vnDate(r.date)}</span><span class="dshort">${vnDate(r.date).slice(0,5)}</span></td><td>${d.num?esc(d.num):'—'}</td><td><span class="tag">${LABEL[r.s]}</span></td>
         <td>${idle?'—':fmt(r.inv)}</td><td>${r.s==='win'?fmt(r.dt):'—'}</td>
         <td class="${r.pl>0?'pos':r.pl<0?'neg':''}">${idle?'—':(r.pl>=0?'+':'')+fmt(r.pl)}</td><td>${r.need>0?fmt(r.need):'—'}</td><td><b>${fmt(r.cash)}</b></td>
-        <td><div class="acts"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xóa</button></div></td></tr>`;
+        <td>${canEdit(d.who)?'<div class="acts"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xóa</button></div>':''}</td></tr>`;
     });
     sec.innerHTML=`<div class="inv-head"><h2><span class="chip" style="background:${color(p.id)}"></span>${esc(p.name)}</h2>
         <div class="row-actions" style="margin:0"><button type="button" class="png">Tải ảnh PNG</button></div></div>
@@ -266,9 +348,10 @@ function render(){
       </div>
       <p class="note pngMsg" style="margin:8px 0 0"></p>`;
     sec.querySelectorAll('tr[data-id]').forEach(tr=>{
-      const id=+tr.dataset.id;
+      const id=tr.dataset.id;
+      if(!tr.querySelector('.edit')) return;
       tr.querySelector('.edit').addEventListener('click',()=>startEdit(id));
-      tr.querySelector('.del').addEventListener('click',()=>{days=days.filter(x=>x.id!==id); if(editId===id) resetForm(); persist(); render();});
+      tr.querySelector('.del').addEventListener('click',()=>{days=days.filter(x=>x.id!==id); if(editId===id) resetForm(); persist(); render(); removeEntry(id);});
     });
     sec.querySelector('.png').addEventListener('click',()=>exportPng(p,R,sec.querySelector('.pngMsg')));
     blocks.appendChild(sec);
@@ -302,7 +385,7 @@ function resetForm(){
   fillDefaults();
 }
 function startEdit(id){
-  const d=days.find(x=>x.id===id); if(!d) return;
+  const d=days.find(x=>x.id===id); if(!d||!canEdit(d.who)) return;
   editId=id; $('f').classList.add('editing');
   $('fTitle').textContent='Sửa ngày '+vnDate(d.date)+' của '+nameOf(d.who); $('fSave').textContent='Cập nhật'; $('fCancel').hidden=false; $('fErr').textContent='';$('fOk').textContent='';
   $('fWho').value=d.who; $('fDate').value=d.date||''; $('fNum').value=d.num||''; $('fStatus').value=d.s;
@@ -322,13 +405,16 @@ function save(){
   const rec={who,num:$('fNum').value.trim(),date,s,src:$('fSrc').value,inv:s==='idle'?0:num(inv),dt:s==='win'?num(dt):0};
   const wasEdit=editId!==null;
   if(wasEdit){ Object.assign(days.find(x=>x.id===editId),rec); }
-  else{ if(demo){demo=false;days=[];} days.push({...rec,id:uid++}); }
-  tab=who; persist(); resetForm(); render();
+  let target;
+  if(wasEdit){ target=days.find(x=>x.id===editId); }
+  else{ if(demo){demo=false;days=[];} target={...rec,id:newId(),t:Date.now()}; days.push(target); }
+  tab=who; keepTab(); persist(); resetForm(); render();
+  writeEntry(target);
   $('fOk').textContent=(wasEdit?'Đã cập nhật ':'Đã lưu ')+vnDate(date)+' cho '+nameOf(who)+'.';
 }
 
 $('fStatus').addEventListener('change',syncFields);
-$('fWho').addEventListener('change',()=>{ if(editId===null) fillDefaults(); tab=$('fWho').value; render(); });
+$('fWho').addEventListener('change',()=>{ if(editId===null) fillDefaults(); tab=$('fWho').value; keepTab(); render(); });
 $('fCancel').addEventListener('click',()=>{resetForm();render()});
 $('f').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();save();} });
 $('fSave').addEventListener('click',save);
@@ -392,7 +478,7 @@ async function exportPng(p,R,msg){
   }
 }
 
-renderSelect(); resetForm(); render();
+renderSelect(); resetForm(); render(); connectDb();
 </script>
 </body>
 </html>
