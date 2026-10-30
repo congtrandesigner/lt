@@ -36,7 +36,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .ratio{margin:12px 0 0;font-size:.88rem;color:var(--muted)}
 .ratio b{color:var(--accent);font-family:var(--mono)}
 .tbl{overflow-x:auto}
-table{border-collapse:collapse;width:100%;min-width:820px;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;min-width:880px;font-variant-numeric:tabular-nums}
 th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
 td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-size:.92rem;white-space:nowrap}
@@ -84,6 +84,29 @@ tr.cur{outline:2px solid var(--accent);outline-offset:-2px}
 tr.lost .tag{background:var(--warn-soft);color:var(--warn)}
 tr.idle .tag{background:var(--idle);color:var(--muted)}
 .demo{font-size:.84rem;color:var(--muted);background:var(--idle);border-radius:6px;padding:8px 10px;margin:0 0 10px}
+.people{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.people label{flex:1 1 150px;min-width:0}
+.people input[type=text],.ptext{font:600 .95rem var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;box-sizing:border-box}
+.overview table{min-width:520px}
+.overview td:first-child{font-weight:700}
+.inv-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.inv-head h2{font-size:1.15rem;margin:0}
+.inv-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:12px}
+.inv-sum.down{background:var(--warn-soft);border-color:var(--warn)}
+.inv-sum div{display:flex;flex-direction:column}
+.inv-sum span{font-size:.78rem;color:var(--muted)}
+.inv-sum b{font-family:var(--mono);font-size:1.05rem}
+.inv-sum .hl b{font-size:1.35rem;color:var(--accent)}
+.inv-sum.down .hl b{color:var(--warn)}
+.chip{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
+tr.sumrow td{font-weight:700;border-top:2px solid var(--line)}
+.tabwrap{display:flex;flex-direction:column}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;position:relative;z-index:1;margin-bottom:-1px}
+.tab{display:flex;align-items:center;gap:2px;border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0;background:var(--bg);color:var(--muted);padding:10px 16px;font-size:.95rem}
+.tab small{font:600 .78rem var(--mono);margin-left:8px;color:var(--muted)}
+.tab.on{background:var(--card);color:var(--fg);border-color:var(--line)}
+.tab.on small{color:var(--accent)}
+.tabpanel{border-top-left-radius:0}
 </style>
 </head>
 <body>
@@ -91,13 +114,15 @@ tr.idle .tag{background:var(--idle);color:var(--muted)}
 <div class="wrap">
   <header>
     <h1>Tính vốn và lời theo ngày</h1>
-    <p class="sub">Đơn vị: nghìn đồng (k).</p>
+    <p class="sub">Đơn vị: nghìn đồng (k). Mỗi nhà đầu tư có bảng và tổng riêng.</p>
   </header>
 
   <section class="panel" id="f">
     <div class="form-head"><h2 id="fTitle">Nhập ngày mới</h2></div>
     <div class="form">
+      <label for="fWho">Nhà đầu tư<select id="fWho"></select></label>
       <label for="fDate">Ngày<input id="fDate" type="date" required></label>
+      <label for="fNum">Số<input id="fNum" type="text" class="ptext" inputmode="numeric" placeholder="VD: 27" maxlength="60"></label>
       <label for="fStatus">Tình trạng
         <select id="fStatus"><option value="win">Có doanh thu</option><option value="lost">Mất vốn</option><option value="idle">Không đầu tư</option></select></label>
       <label for="fSrc">Vốn lấy từ đâu
@@ -113,36 +138,23 @@ tr.idle .tag{background:var(--idle);color:var(--muted)}
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel overview">
     <div class="list-head">
-      <h2>Các ngày đã lưu</h2>
-      <div class="row-actions" style="margin:0">
-        <button id="png" type="button">Tải ảnh PNG</button>
-        <button id="reset" type="button">Xóa hết</button>
-      </div>
+      <h2>Tổng hợp</h2>
     </div>
-    <p class="demo" id="demo" hidden>Đây là số ví dụ. Bấm “Xóa hết” để bắt đầu nhập số của anh.</p>
-    <div id="confirmBox" class="demo" hidden>Xóa toàn bộ các ngày đã lưu? <button type="button" id="yesClear" class="del">Xóa hết</button> <button type="button" id="noClear">Thôi</button></div>
-    <div class="tbl">
-      <table>
-        <thead><tr><th>Ngày</th><th>Tình trạng</th><th>Vốn đầu tư</th><th>Doanh thu</th><th>Lời / lỗ</th><th>Vốn bỏ thêm</th><th>Tiền đang có</th><th><span class="sr">Sửa, xóa</span></th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
-    <p class="note" id="pngMsg" style="margin:8px 0 0"></p>
-    <p class="note"><b>Bỏ thêm tiền mới:</b> số vốn hôm đó là tiền mới anh bỏ vào, cộng vào tổng vốn. <b>Lấy từ tiền đang có:</b> dùng lại tiền đã thu về, không cộng vào tổng vốn (nếu tiền đang có không đủ thì phần thiếu tính là vốn bỏ thêm).</p>
+    <p class="demo" id="demo" hidden>Đây là số ví dụ. Số ví dụ tự mất khi anh lưu ngày đầu tiên.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Nhà đầu tư</th><th>Số ngày</th><th>Vốn bỏ ra</th><th>Lời / lỗ</th><th>Cần rút về</th></tr></thead>
+      <tbody id="ov"></tbody>
+    </table></div>
   </section>
 
-  <section class="total" id="totalBox" aria-live="polite">
-    <span style="font-size:.85rem;font-weight:600">Tổng cần rút về (cả vốn lẫn lời)</span>
-    <p class="big" id="final">–</p>
-    <div class="sum">
-      <div><span>Tổng vốn anh bỏ ra</span><b id="sVon">–</b></div>
-      <div><span>Lời / lỗ thực tế</span><b id="sLoi">–</b></div>
-      <div><span>Ngày có doanh thu</span><b id="sWin">–</b></div>
-      <div><span>Ngày mất vốn</span><b id="sLost">–</b></div>
-    </div>
-  </section>
+  <div class="tabwrap">
+    <div class="tabs" role="tablist" id="tabs" aria-label="Nhà đầu tư"></div>
+    <div id="blocks"></div>
+  </div>
+
+  <p class="note"><b>Bỏ thêm tiền mới:</b> số vốn hôm đó là tiền mới bỏ vào, cộng vào tổng vốn. <b>Lấy từ tiền đang có:</b> dùng lại tiền đã thu về, không cộng vào tổng vốn (nếu tiền đang có không đủ thì phần thiếu tính là vốn bỏ thêm).</p>
 </div>
 
 <script>
@@ -152,58 +164,108 @@ const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n};
 const iso=dt=>{const z=new Date(dt.getTime()-dt.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
 const nextDay=v=>{const t=new Date(v+'T12:00:00');t.setDate(t.getDate()+1);return iso(t)};
 const vnDate=v=>v?v.split('-').reverse().join('/'):'—';
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const LABEL={win:'Có doanh thu',lost:'Mất vốn',idle:'Không đầu tư'};
-const KEY='tinh-von-loi-v1';
-const OUT={rows:[]};
-let uid=1, editId=null, demo=false;
-let days=[];
+const DOTS=['#0f7a52','#2f5fb3','#b0601c','#7a3fa0','#a33a5a','#3a8a8a'];
+const KEY='tinh-von-loi-v2', OLDKEY='tinh-von-loi-v1';
+let uid=1, editId=null, demo=false, tab=null;
+try{tab=localStorage.getItem('tinh-von-loi-tab')}catch(e){}
+let people=[], days=[];
 
-// Nạp dữ liệu đã lưu trong trình duyệt; chưa có thì hiện số ví dụ
-try{const raw=localStorage.getItem(KEY); if(raw){days=JSON.parse(raw)}}catch(e){}
-if(!Array.isArray(days)||!days.length){
+// Nạp dữ liệu; bản cũ (1 người) chuyển sang Người 1
+try{
+  const raw=localStorage.getItem(KEY);
+  if(raw){const o=JSON.parse(raw);people=o.people||[];days=o.days||[];}
+  else{const old=localStorage.getItem(OLDKEY); if(old){days=JSON.parse(old).map(d=>({...d,who:'p1'}));}}
+}catch(e){}
+// Danh sách nhà đầu tư cố định
+people=[{id:'p1',name:'Sơ Kê'},{id:'p2',name:'Đư Cờ'},{id:'p3',name:'Cô Cô'}];
+if(!days.length){
   demo=true;
-  const ex=[['win',162,294,'new'],['win',162,294,'new'],['idle',0,0,'cash'],['lost',162,0,'cash'],['win',162,294,'cash']];
-  days=ex.map(([s,inv,dt,src],i)=>{const t=new Date();t.setDate(t.getDate()-(ex.length-1-i));return {s,inv,dt,src,date:iso(t)}});
+  const ex=[['p1','win',162,294,'new',2],['p1','win',162,294,'new',1],['p1','win',162,294,'cash',0],
+            ['p2','win',200,363,'new',1],['p2','lost',200,0,'cash',0],
+            ['p3','win',162,294,'new',2],['p3','idle',0,0,'cash',1],['p3','win',162,294,'cash',0]];
+  days=ex.map(([who,s,inv,dt,src,back])=>{const t=new Date();t.setDate(t.getDate()-back);return {who,s,inv,dt,src,date:iso(t)}});
 }
 days.forEach(d=>d.id=uid++);
-function persist(){ if(demo) return; try{localStorage.setItem(KEY,JSON.stringify(days.map(({id,...r})=>r)))}catch(e){} }
-function leaveDemo(){ if(demo){demo=false;days=[];} }
+function persist(){ if(demo){ try{localStorage.setItem(KEY,JSON.stringify({people,days:[]}))}catch(e){} return; }
+  try{localStorage.setItem(KEY,JSON.stringify({people,days:days.map(({id,...r})=>r)}))}catch(e){} }
+const nameOf=id=>(people.find(p=>p.id===id)||{}).name||'(đã xóa)';
+const color=id=>DOTS[Math.max(0,people.findIndex(p=>p.id===id))%DOTS.length];
 
-function sorted(){return [...days].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id-b.id)}
-
-function render(){
-  const tb=$('rows');tb.innerHTML='';
-  $('demo').hidden=!demo;
-  let cash=0,totalIn=0,win=0,lost=0; OUT.rows=[];
-  const list=sorted();
-  if(!list.length) tb.innerHTML='<tr class="empty"><td colspan="8">Chưa có ngày nào. Nhập ở form phía trên rồi bấm Lưu.</td></tr>';
+function compute(who){
+  const list=days.filter(d=>d.who===who).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id-b.id);
+  let cash=0,totalIn=0,win=0,lost=0; const rows=[];
   list.forEach(d=>{
     const inv=d.s==='idle'?0:num(d.inv), dt=d.s==='win'?num(d.dt):0;
     if(d.s==='win')win++; if(d.s==='lost')lost++;
     const fresh=d.s!=='idle'&&d.src==='new'?inv:0; cash+=fresh; totalIn+=fresh;
     const short=Math.max(0,inv-cash); cash+=short; totalIn+=short;
-    const need=fresh+short;
     const pl=dt-inv; cash+=pl;
-    OUT.rows.push({date:d.date,s:d.s,inv,dt,pl,need,cash});
-    const tr=document.createElement('tr');tr.className=d.s+(d.id===editId?' cur':'');
-    const plTxt=d.s==='idle'?'—':(pl>=0?'+':'')+fmt(pl);
-    tr.innerHTML=`<td>${vnDate(d.date)}</td><td><span class="tag">${LABEL[d.s]}</span></td>
-      <td>${d.s==='idle'?'—':fmt(inv)}</td><td>${d.s==='win'?fmt(dt):'—'}</td>
-      <td class="${pl>0?'pos':pl<0?'neg':''}">${plTxt}</td><td>${need>0?fmt(need):'—'}</td><td><b>${fmt(cash)}</b></td>
-      <td><div class="acts"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xóa</button></div></td>`;
-    tr.querySelector('.edit').addEventListener('click',()=>startEdit(d.id));
-    tr.querySelector('.del').addEventListener('click',()=>{
-      days=days.filter(x=>x.id!==d.id); if(editId===d.id) resetForm(); persist(); render();
-    });
-    tb.appendChild(tr);
+    rows.push({ref:d,num:d.num||'',date:d.date,s:d.s,inv,dt,pl,need:fresh+short,cash});
   });
-  Object.assign(OUT,{cash,totalIn,win,lost});
-  const pl=cash-totalIn;
-  $('final').textContent=fmt(cash);
-  $('sVon').textContent=fmt(totalIn);
-  const sl=$('sLoi'); sl.textContent=(pl>=0?'+':'')+fmt(pl); sl.className=pl>=0?'pos':'neg';
-  $('sWin').textContent=win; $('sLost').textContent=lost;
-  $('totalBox').classList.toggle('down',pl<0);
+  return {rows,cash,totalIn,win,lost};
+}
+
+function renderSelect(){
+  const sel=$('fWho'), cur=sel.value;
+  sel.innerHTML=people.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  if(people.some(p=>p.id===cur)) sel.value=cur;
+}
+
+function render(){
+  $('demo').hidden=!demo;
+  const ov=$('ov'); ov.innerHTML='';
+  const blocks=$('blocks'); blocks.innerHTML='';
+  const tabs=$('tabs'); tabs.innerHTML='';
+  if(!people.some(p=>p.id===tab)) tab=people[0].id;
+  let gIn=0,gCash=0,gN=0;
+  people.forEach(p=>{
+    const R=compute(p.id); const pl=R.cash-R.totalIn;
+    gIn+=R.totalIn; gCash+=R.cash; gN+=R.rows.length;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><span class="chip" style="background:${color(p.id)}"></span>${esc(p.name)}</td><td>${R.rows.length}</td><td>${fmt(R.totalIn)}</td>
+      <td class="${pl>=0?'pos':'neg'}">${(pl>=0?'+':'')+fmt(pl)}</td><td><b>${fmt(R.cash)}</b></td>`;
+    ov.appendChild(tr);
+
+    const tb=document.createElement('button'); tb.type='button'; tb.setAttribute('role','tab');
+    tb.className='tab'+(p.id===tab?' on':''); tb.setAttribute('aria-selected',p.id===tab);
+    tb.innerHTML=`<span class="chip" style="background:${color(p.id)}"></span>${esc(p.name)}<small>${fmt(R.cash)}</small>`;
+    tb.addEventListener('click',()=>{tab=p.id; try{localStorage.setItem('tinh-von-loi-tab',tab)}catch(e){} render();});
+    tabs.appendChild(tb);
+    if(p.id!==tab) return;
+    const sec=document.createElement('section'); sec.className='panel tabpanel'; sec.setAttribute('role','tabpanel');
+    let rowsHtml=R.rows.length?'':'<tr class="empty"><td colspan="9">Chưa có ngày nào. Chọn nhà đầu tư này ở form nhập rồi bấm Lưu.</td></tr>';
+    R.rows.forEach(r=>{
+      const d=r.ref, idle=r.s==='idle';
+      rowsHtml+=`<tr class="${r.s}${d.id===editId?' cur':''}" data-id="${d.id}"><td>${vnDate(r.date)}</td><td>${d.num?esc(d.num):'—'}</td><td><span class="tag">${LABEL[r.s]}</span></td>
+        <td>${idle?'—':fmt(r.inv)}</td><td>${r.s==='win'?fmt(r.dt):'—'}</td>
+        <td class="${r.pl>0?'pos':r.pl<0?'neg':''}">${idle?'—':(r.pl>=0?'+':'')+fmt(r.pl)}</td><td>${r.need>0?fmt(r.need):'—'}</td><td><b>${fmt(r.cash)}</b></td>
+        <td><div class="acts"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xóa</button></div></td></tr>`;
+    });
+    sec.innerHTML=`<div class="inv-head"><h2><span class="chip" style="background:${color(p.id)}"></span>${esc(p.name)}</h2>
+        <div class="row-actions" style="margin:0"><button type="button" class="png">Tải ảnh PNG</button></div></div>
+      <div class="tbl"><table><thead><tr><th>Ngày</th><th>Số</th><th>Tình trạng</th><th>Vốn đầu tư</th><th>Doanh thu</th><th>Lời / lỗ</th><th>Vốn bỏ thêm</th><th>Tiền đang có</th><th><span class="sr">Sửa, xóa</span></th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table></div>
+      <div class="inv-sum${pl<0?' down':''}">
+        <div class="hl"><span>Cần rút về (vốn + lời)</span><b>${fmt(R.cash)}</b></div>
+        <div><span>Vốn bỏ ra</span><b>${fmt(R.totalIn)}</b></div>
+        <div><span>Lời / lỗ</span><b class="${pl>=0?'pos':'neg'}">${(pl>=0?'+':'')+fmt(pl)}</b></div>
+        <div><span>Ngày có doanh thu / mất vốn</span><b>${R.win} / ${R.lost}</b></div>
+      </div>
+      <p class="note pngMsg" style="margin:8px 0 0"></p>`;
+    sec.querySelectorAll('tr[data-id]').forEach(tr=>{
+      const id=+tr.dataset.id;
+      tr.querySelector('.edit').addEventListener('click',()=>startEdit(id));
+      tr.querySelector('.del').addEventListener('click',()=>{days=days.filter(x=>x.id!==id); if(editId===id) resetForm(); persist(); render();});
+    });
+    sec.querySelector('.png').addEventListener('click',()=>exportPng(p,R,sec.querySelector('.pngMsg')));
+    blocks.appendChild(sec);
+  });
+  const gpl=gCash-gIn;
+  const tr=document.createElement('tr'); tr.className='sumrow';
+  tr.innerHTML=`<td>Tất cả</td><td>${gN}</td><td>${fmt(gIn)}</td><td class="${gpl>=0?'pos':'neg'}">${(gpl>=0?'+':'')+fmt(gpl)}</td><td>${fmt(gCash)}</td>`;
+  ov.appendChild(tr);
 }
 
 function syncFields(){
@@ -212,57 +274,55 @@ function syncFields(){
   if(s==='idle'){$('fInv').value='';}
   if(s!=='win'){$('fDt').value='';}
 }
-function resetForm(){
-  editId=null; $('f').classList.remove('editing');
-  $('fTitle').textContent='Nhập ngày mới'; $('fSave').textContent='Lưu'; $('fCancel').hidden=true; $('fErr').textContent='';
-  const list=demo?[]:sorted(); const last=list[list.length-1];
+function fillDefaults(){
+  const who=$('fWho').value;
+  const list=demo?[]:days.filter(d=>d.who===who).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const last=list[list.length-1];
   $('fDate').value=last&&last.date?nextDay(last.date):iso(new Date());
   $('fStatus').value='win';
   const lastInv=[...list].reverse().find(d=>d.s!=='idle'&&d.inv);
-  $('fInv').value=lastInv?lastInv.inv:''; $('fDt').value='';
+  $('fInv').value=lastInv?lastInv.inv:''; $('fDt').value=''; $('fNum').value='';
   $('fSrc').value=lastInv&&lastInv.src?lastInv.src:'new';
   syncFields();
+}
+function resetForm(){
+  editId=null; $('f').classList.remove('editing');
+  $('fTitle').textContent='Nhập ngày mới'; $('fSave').textContent='Lưu'; $('fCancel').hidden=true; $('fErr').textContent='';
+  fillDefaults();
 }
 function startEdit(id){
   const d=days.find(x=>x.id===id); if(!d) return;
   editId=id; $('f').classList.add('editing');
-  $('fTitle').textContent='Sửa ngày '+vnDate(d.date); $('fSave').textContent='Cập nhật'; $('fCancel').hidden=false; $('fErr').textContent='';
-  $('fDate').value=d.date||''; $('fStatus').value=d.s;
-  $('fInv').value=d.s==='idle'?'':d.inv; $('fDt').value=d.s==='win'?d.dt:'';
-  $('fSrc').value=d.src||'cash';
+  $('fTitle').textContent='Sửa ngày '+vnDate(d.date)+' của '+nameOf(d.who); $('fSave').textContent='Cập nhật'; $('fCancel').hidden=false; $('fErr').textContent='';$('fOk').textContent='';
+  $('fWho').value=d.who; $('fDate').value=d.date||''; $('fNum').value=d.num||''; $('fStatus').value=d.s;
+  $('fInv').value=d.s==='idle'?'':d.inv; $('fDt').value=d.s==='win'?d.dt:''; $('fSrc').value=d.src||'cash';
   syncFields(); render();
   $('f').scrollIntoView({behavior:'smooth',block:'start'}); $('fInv').focus({preventScroll:true});
 }
-
-$('fStatus').addEventListener('change',syncFields);
-$('fCancel').addEventListener('click',()=>{resetForm();render()});
-$('f').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();save();} });
-$('fSave').addEventListener('click',save);
 function save(){
   $('fOk').textContent='';
-  const s=$('fStatus').value, date=$('fDate').value;
+  const who=$('fWho').value, s=$('fStatus').value, date=$('fDate').value;
   const inv=$('fInv').value, dt=$('fDt').value;
+  if(!who){$('fErr').textContent='Anh chọn nhà đầu tư.';return}
   if(!date){$('fErr').textContent='Anh chọn ngày trước khi lưu.';return}
   if(s!=='idle'&&inv!==''&&num(inv)<0){$('fErr').textContent='Vốn đầu tư không được âm.';$('fInv').focus();return}
   if(s==='win'&&dt===''){$('fErr').textContent='Anh nhập doanh thu thu về. Nếu không thu được gì thì chọn "Mất vốn".';$('fDt').focus();return}
-  const rec={date,s,src:$('fSrc').value,inv:s==='idle'?0:num(inv),dt:s==='win'?num(dt):0};
-  if(editId!==null){
-    Object.assign(days.find(x=>x.id===editId),rec);
-  }else{
-    leaveDemo(); days.push({...rec,id:uid++});
-  }
+  $('fErr').textContent='';
+  const rec={who,num:$('fNum').value.trim(),date,s,src:$('fSrc').value,inv:s==='idle'?0:num(inv),dt:s==='win'?num(dt):0};
   const wasEdit=editId!==null;
-  persist(); resetForm(); render();
-  $('fOk').textContent=(wasEdit?'Đã cập nhật ngày ':'Đã lưu ngày ')+vnDate(date)+'.';
+  if(wasEdit){ Object.assign(days.find(x=>x.id===editId),rec); }
+  else{ if(demo){demo=false;days=[];} days.push({...rec,id:uid++}); }
+  tab=who; persist(); resetForm(); render();
+  $('fOk').textContent=(wasEdit?'Đã cập nhật ':'Đã lưu ')+vnDate(date)+' cho '+nameOf(who)+'.';
 }
 
-$('reset').addEventListener('click',()=>{$('confirmBox').hidden=false});
-$('noClear').addEventListener('click',()=>{$('confirmBox').hidden=true});
-$('yesClear').addEventListener('click',()=>{
-  $('confirmBox').hidden=true; demo=false; days=[]; persist(); resetForm(); render();
-});
+$('fStatus').addEventListener('change',syncFields);
+$('fWho').addEventListener('change',()=>{ if(editId===null) fillDefaults(); tab=$('fWho').value; render(); });
+$('fCancel').addEventListener('click',()=>{resetForm();render()});
+$('f').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();save();} });
+$('fSave').addEventListener('click',save);
 
-async function makePng(){
+async function makePng(name,OUT){
   try{await document.fonts.ready}catch(e){}
   const W=900,rowH=34,top=150,n=OUT.rows.length;
   const H=top+rowH*(n+1)+190, sc=2;
@@ -271,11 +331,11 @@ async function makePng(){
   const F='"Be Vietnam Pro",system-ui,sans-serif', M='"JetBrains Mono",ui-monospace,monospace';
   const C={bg:'#f3f5f2',card:'#ffffff',fg:'#17201b',mu:'#5d6b63',ln:'#d9e0db',ac:'#0f7a52',acs:'#e2f1ea',wa:'#b3401f',was:'#fbe9e3',id:'#eef0ee'};
   g.fillStyle=C.bg;g.fillRect(0,0,W,H);
-  g.fillStyle=C.fg;g.font='700 26px '+F;g.fillText('Tính vốn và lời theo ngày',32,52);
+  g.fillStyle=C.fg;g.font='700 26px '+F;g.fillText('Vốn và lời: '+name,32,52);
   g.fillStyle=C.mu;g.font='400 14px '+F;
   const ds=OUT.rows.map(r=>r.date).filter(Boolean);
   g.fillText('Đơn vị: nghìn đồng (k)'+(ds.length?`  ·  Từ ${vnDate(ds[0])} đến ${vnDate(ds[ds.length-1])}`:''),32,80);
-  const cols=[['Ngày',32,'l'],['Tình trạng',150,'l'],['Vốn đầu tư',380,'r'],['Doanh thu',490,'r'],['Lời / lỗ',610,'r'],['Vốn bỏ thêm',735,'r'],['Tiền đang có',868,'r']];
+  const cols=[['Ngày',32,'l'],['Số',140,'l'],['Tình trạng',215,'l'],['Vốn đầu tư',380,'r'],['Doanh thu',490,'r'],['Lời / lỗ',610,'r'],['Vốn bỏ thêm',735,'r'],['Tiền đang có',868,'r']];
   g.fillStyle=C.card;g.fillRect(16,top-38,W-32,rowH*(n+1)+16);
   g.font='600 11px '+F;g.fillStyle=C.mu;
   cols.forEach(([t,x,a])=>{g.textAlign=a==='r'?'right':'left';g.fillText(t.toUpperCase(),x,top-14)});
@@ -286,7 +346,8 @@ async function makePng(){
     g.strokeStyle=C.ln;g.beginPath();g.moveTo(16,y-4);g.lineTo(W-16,y-4);g.stroke();
     const ty=y+18;
     g.textAlign='left';g.fillStyle=C.fg;g.font='600 14px '+F;g.fillText(vnDate(r.date),32,ty);
-    g.font='400 14px '+F;g.fillText(LABEL[r.s],150,ty);
+    g.font='500 14px '+M;g.fillText(r.num?(r.num.length>7?r.num.slice(0,6)+'…':r.num):'—',140,ty);
+    g.font='400 14px '+F;g.fillText(LABEL[r.s],215,ty);
     g.textAlign='right';g.font='500 14px '+M;
     const idle=r.s==='idle';
     g.fillStyle=C.fg;g.fillText(idle?'—':fmt(r.inv),380,ty);g.fillText(r.s==='win'?fmt(r.dt):'—',490,ty);
@@ -305,10 +366,12 @@ async function makePng(){
 }
 let dl=null;
 (async()=>{try{dl=await window.claude?.use?.('downloads')}catch(e){}})();
-$('png').addEventListener('click',async()=>{
-  const msg=$('pngMsg');msg.textContent='';
-  if(!OUT.rows.length){msg.textContent='Chưa có ngày nào để xuất.';return}
-  const blob=await makePng(); const name='von-loi-'+iso(new Date())+'.png';
+async function exportPng(p,R,msg){
+  msg.textContent='';
+  if(!R.rows.length){msg.textContent='Chưa có ngày nào để xuất.';return}
+  const blob=await makePng(p.name,R);
+  const slug=p.name.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||'nha-dau-tu';
+  const name='von-loi-'+slug+'-'+iso(new Date())+'.png';
   if(dl){
     try{await dl.save({filename:name,data:blob});msg.textContent='Đã lưu ảnh.'}
     catch(e){msg.textContent=e&&e.code==='declined'?'Đã hủy lưu ảnh.':'Không lưu được ảnh ở đây. Anh mở file HTML trên máy để tải.'}
@@ -316,9 +379,9 @@ $('png').addEventListener('click',async()=>{
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   }
-});
+}
 
-resetForm(); render();
+renderSelect(); resetForm(); render();
 </script>
 </body>
 </html>
